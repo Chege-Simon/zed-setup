@@ -1,0 +1,13 @@
+[
+  {
+    "label": "setup new worktree",
+    "command": "/bin/bash",
+    "args": ["~/.config/zed/setup-worktree.sh"],
+    "hooks": ["create_worktree"],
+    "reveal": "no_focus",
+    "hide": "on_success",
+    "env": {
+      "PATH": "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:~/Library/Application\\ Support/Herd/bin"
+    }
+  }
+]
