@@ -72,9 +72,10 @@ This setup is aimed at Laravel + Herd workflows, but the worktree hook works for
 
 The hook calls `setup-worktree.sh`, which:
 
-1. **Copies `.env`** from the main worktree into the new worktree (if one exists).
-2. **Flattens nested worktrees** for Laravel projects — if Zed creates `worktrees/<branch>/<repo-name>/`, the script moves the inner directory up so Herd can serve it at `<branch>.test`.
-3. **Updates `APP_URL`** in the new worktree's `.env` to `http://<worktree-name>.test`, matching Herd's convention.
+1. **Trusts the worktree in Git** — runs `git config --global --add safe.directory` for the new path so Git does not refuse it as a dubious directory.
+2. **Copies `.env`** from the main worktree into the new worktree (if one exists).
+3. **Flattens nested worktrees** for Laravel projects — if Zed creates `worktrees/<branch>/<repo-name>/`, the script moves the inner directory up so Herd can serve it at `<branch>.test`.
+4. **Updates `APP_URL`** in the new worktree's `.env` to `http://<worktree-name>.test`, matching Herd's convention.
 
 After the task finishes, visit the URL in your browser (Herd must be running and the domain should resolve automatically).
 

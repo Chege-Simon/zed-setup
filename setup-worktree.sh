@@ -1,8 +1,21 @@
 #!/bin/bash
 set -euo pipefail
 
+trust_git_directory() {
+  local dir="$1"
+  [ -d "$dir" ] || return 0
+  dir="$(cd "$dir" && pwd)"
+  if git config --global --get-all safe.directory 2>/dev/null | grep -Fxq "$dir"; then
+    return 0
+  fi
+  git config --global --add safe.directory "$dir"
+  echo "✅ Git trusted $dir"
+}
+
 REPO_NAME=$(basename "$ZED_MAIN_GIT_WORKTREE")
 NESTED="$ZED_WORKTREE_ROOT"
+
+trust_git_directory "$NESTED"
 
 if [ "$(basename "$NESTED")" = "$REPO_NAME" ]; then
   WORKTREE_NAME=$(basename "$(dirname "$NESTED")")
@@ -25,6 +38,8 @@ if [ -f "$NESTED/artisan" ] && [ "$(basename "$NESTED")" = "$REPO_NAME" ] && [ "
 else
   TARGET="$NESTED"
 fi
+
+trust_git_directory "$TARGET"
 
 sed -i '' "s|APP_URL=.*|APP_URL=http://${WORKTREE_NAME}.test|" "$TARGET/.env" 2>/dev/null || true
 echo "✅ APP_URL updated to http://${WORKTREE_NAME}.test"
