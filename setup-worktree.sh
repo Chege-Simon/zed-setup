@@ -1,20 +1,45 @@
 #!/bin/bash
 set -euo pipefail
 
+# Zed task hooks may run with a minimal environment (wrong or missing HOME).
+# libgit2 reads the same global gitconfig as the CLI, so point at the real one.
+export HOME="${HOME:-/Users/$(id -un)}"
+export GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL:-$HOME/.gitconfig}"
+
+git_config_paths() {
+  git config --global --get-all safe.directory 2>/dev/null || true
+}
+
 trust_git_directory() {
   local dir="$1"
   [ -d "$dir" ] || return 0
-  dir="$(cd "$dir" && pwd)"
-  if git config --global --get-all safe.directory 2>/dev/null | grep -Fxq "$dir"; then
+  dir="$(cd "$dir" && pwd -P)"
+
+  if git_config_paths | grep -Fxq "$dir"; then
     return 0
   fi
+
   git config --global --add safe.directory "$dir"
-  echo "✅ Git trusted $dir"
+  echo "✅ Git trusted $dir (wrote to $GIT_CONFIG_GLOBAL)"
+}
+
+prune_stale_safe_directories() {
+  local dir
+  while IFS= read -r dir; do
+    [ -z "$dir" ] && continue
+    [[ "$dir" == *"*"* ]] && continue
+    [ -d "$dir" ] && continue
+    git config --global --unset-all safe.directory "$dir" 2>/dev/null || true
+    echo "🧹 Removed stale safe.directory entry: $dir"
+  done < <(git_config_paths)
 }
 
 REPO_NAME=$(basename "$ZED_MAIN_GIT_WORKTREE")
 NESTED="$ZED_WORKTREE_ROOT"
 
+# Zed's libgit2 requires exact paths (wildcards like /worktrees/* do not work).
+# Trust before any git commands, and again after flatten when the path changes.
+trust_git_directory "$ZED_MAIN_GIT_WORKTREE"
 trust_git_directory "$NESTED"
 
 if [ "$(basename "$NESTED")" = "$REPO_NAME" ]; then
@@ -40,6 +65,7 @@ else
 fi
 
 trust_git_directory "$TARGET"
+prune_stale_safe_directories
 
 sed -i '' "s|APP_URL=.*|APP_URL=http://${WORKTREE_NAME}.test|" "$TARGET/.env" 2>/dev/null || true
 echo "✅ APP_URL updated to http://${WORKTREE_NAME}.test"

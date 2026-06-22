@@ -72,12 +72,14 @@ This setup is aimed at Laravel + Herd workflows, but the worktree hook works for
 
 The hook calls `setup-worktree.sh`, which:
 
-1. **Trusts the worktree in Git** — runs `git config --global --add safe.directory` for the new path so Git does not refuse it as a dubious directory.
+1. **Trusts directories in Git** — adds exact paths to `safe.directory` in your global `~/.gitconfig` (main repo + worktree, before and after flatten). Zed uses libgit2, which only honors exact paths—not `/*` wildcards—so the hook sets `HOME` explicitly to write the same config file Zed reads.
 2. **Copies `.env`** from the main worktree into the new worktree (if one exists).
 3. **Flattens nested worktrees** for Laravel projects — if Zed creates `worktrees/<branch>/<repo-name>/`, the script moves the inner directory up so Herd can serve it at `<branch>.test`.
 4. **Updates `APP_URL`** in the new worktree's `.env` to `http://<worktree-name>.test`, matching Herd's convention.
 
 After the task finishes, visit the URL in your browser (Herd must be running and the domain should resolve automatically).
+
+If the git panel still shows a trust/ownership error after creation, run **Developer: Reload Window** from the command palette — the hook runs after Zed creates the worktree, so the panel may need a reload to pick up the new `safe.directory` entry (especially after flattening changes the path).
 
 ### Customizing for your machine
 

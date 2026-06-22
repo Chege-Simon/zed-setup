@@ -36,6 +36,7 @@
   "agent_servers": {
     "cursor": {
       "default_config_options": {
+        "mode": "ask",
         "model": "composer-2.5[fast=true]"
       },
       "type": "registry"
