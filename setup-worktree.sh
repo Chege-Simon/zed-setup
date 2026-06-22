@@ -12,8 +12,10 @@ git_config_paths() {
 
 trust_git_directory() {
   local dir="$1"
-  [ -d "$dir" ] || return 0
-  dir="$(cd "$dir" && pwd -P)"
+  [ -e "$dir" ] || return 0
+  # Use logical paths (pwd), not physical (pwd -P). Zed/libgit2 matches the
+  # exact path it opened; resolving symlinks stores the wrong directory.
+  dir="$(cd "$dir" && pwd)"
 
   if git_config_paths | grep -Fxq "$dir"; then
     return 0
@@ -28,19 +30,35 @@ prune_stale_safe_directories() {
   while IFS= read -r dir; do
     [ -z "$dir" ] && continue
     [[ "$dir" == *"*"* ]] && continue
-    [ -d "$dir" ] && continue
+    [[ "$dir" != /* ]] && {
+      git config --global --unset-all safe.directory "$dir" 2>/dev/null || true
+      echo "🧹 Removed invalid safe.directory entry: $dir"
+      continue
+    }
+    [ -e "$dir" ] && continue
     git config --global --unset-all safe.directory "$dir" 2>/dev/null || true
     echo "🧹 Removed stale safe.directory entry: $dir"
   done < <(git_config_paths)
 }
 
+exclude_from_git_status() {
+  local target="$1"
+  local name="$2"
+  local common_git_dir exclude_file pattern
+
+  common_git_dir="$(git -C "$target" rev-parse --git-common-dir)"
+  exclude_file="$common_git_dir/info/exclude"
+  pattern="/$name"
+
+  mkdir -p "$(dirname "$exclude_file")"
+  if ! grep -Fxq "$pattern" "$exclude_file" 2>/dev/null; then
+    echo "$pattern" >> "$exclude_file"
+    echo "🙈 Ignored $pattern in git status (local exclude)"
+  fi
+}
+
 REPO_NAME=$(basename "$ZED_MAIN_GIT_WORKTREE")
 NESTED="$ZED_WORKTREE_ROOT"
-
-# Zed's libgit2 requires exact paths (wildcards like /worktrees/* do not work).
-# Trust before any git commands, and again after flatten when the path changes.
-trust_git_directory "$ZED_MAIN_GIT_WORKTREE"
-trust_git_directory "$NESTED"
 
 if [ "$(basename "$NESTED")" = "$REPO_NAME" ]; then
   WORKTREE_NAME=$(basename "$(dirname "$NESTED")")
@@ -64,6 +82,29 @@ else
   TARGET="$NESTED"
 fi
 
+# Zed opens .../<branch>/<repo> (e.g. cyan-plume/bizwiz) due to a known path
+# quirk in worktree creation. After flattening, recreate that nested path as a
+# symlink so Zed's git panel can find the repo at the path it expects.
+ZED_REPO_PATH="$TARGET"
+if [ "$TARGET" != "$NESTED" ]; then
+  ZED_REPO_PATH="$TARGET/$REPO_NAME"
+
+  # Flattening can leave an empty nested folder before the symlink is recreated.
+  if [ -d "$ZED_REPO_PATH" ] && [ ! -L "$ZED_REPO_PATH" ] && [ -z "$(ls -A "$ZED_REPO_PATH" 2>/dev/null)" ]; then
+    rmdir "$ZED_REPO_PATH"
+    echo "🧹 Removed empty residue folder: $ZED_REPO_PATH"
+  fi
+
+  if [ ! -e "$ZED_REPO_PATH" ]; then
+    ln -s . "$ZED_REPO_PATH"
+    echo "🔗 Created symlink for Zed: $ZED_REPO_PATH -> ."
+  fi
+
+  exclude_from_git_status "$TARGET" "$REPO_NAME"
+fi
+
+trust_git_directory "$ZED_MAIN_GIT_WORKTREE"
+trust_git_directory "$ZED_REPO_PATH"
 trust_git_directory "$TARGET"
 prune_stale_safe_directories
 

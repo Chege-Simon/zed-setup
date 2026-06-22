@@ -2,14 +2,12 @@
   {
     "label": "setup new worktree",
     "command": "/bin/bash",
-    "args": ["$HOME/.config/zed/setup-worktree.sh"],
+    "args": ["~/.config/zed/setup-worktree.sh"],
     "hooks": ["create_worktree"],
     "reveal": "no_focus",
     "hide": "on_success",
     "env": {
-      "HOME": "$HOME",
-      "GIT_CONFIG_GLOBAL": "$HOME/.gitconfig",
-      "PATH": "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/Library/Application Support/Herd/bin"
+      "PATH": "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:~/Library/Application Support/Herd/bin"
     }
   }
 ]
